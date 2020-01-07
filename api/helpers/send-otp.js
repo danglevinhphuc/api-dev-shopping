@@ -12,6 +12,7 @@ module.exports = {
   exits: {},
   fn: async function(inputs, exits) {
     // create reusable transporter object using the default SMTP transport
+    var blockMinute = 5;
     var transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587,
@@ -25,7 +26,16 @@ module.exports = {
       username: inputs.username,
       otp: inputs.otp
     };
-    var dataGenerateBase64= Buffer.from(JSON.stringify(objectGenerateBase64)).toString('base64');
+    var stringObjectGenerateBase64 = JSON.stringify(objectGenerateBase64);
+    var getDataFromRedis = await sails.helpers.getRedis.with({
+      key: { key: stringObjectGenerateBase64, type: "otp" }
+    });
+    var dataGenerateBase64= Buffer.from(stringObjectGenerateBase64).toString('base64');
+    if(checkNextActionRedis(getDataFromRedis)){
+      addCountOtpFail(getDataFromRedis, stringObjectGenerateBase64, blockMinute);
+    }else{
+      return exits.success({ success: false,error: `Lock account ${blockMinute} minutes` });
+    }
     var mailOptions = {
       from: "OTP", // sender address
       to: inputs.email, // list of receivers
@@ -68,3 +78,55 @@ module.exports = {
     return exits.success({ success: true });
   }
 };
+function checkNextActionRedis(getDataFromRedis){
+  if(!getDataFromRedis ||
+    (getDataFromRedis && !getDataFromRedis.data) ||
+    (getDataFromRedis &&
+      getDataFromRedis.data &&
+      getDataFromRedis.data.data.count < 4) ||
+    (getDataFromRedis &&
+      getDataFromRedis.data &&
+      getDataFromRedis.data.data.count >= 4 &&
+      getDataFromRedis.data.expired < new Date().getTime())){
+        // next
+        return true;
+      }
+    return false
+}
+async function addCountOtpFail(getDataFromRedis, key, blockMinute) {
+  var expired = new Date().getTime() + blockMinute * 60000;
+  // var expired = new Date().getTime() + 10000;
+  if (!getDataFromRedis || (getDataFromRedis && !getDataFromRedis.data)) {
+    // set redis
+    //
+    await sails.helpers.setRedis.with({
+      key,
+      type: "otp",
+      data: { count: 1 },
+      expired
+    });
+  } else if (
+    getDataFromRedis &&
+    getDataFromRedis.data.data &&
+    getDataFromRedis.data.data.count < 4
+  ) {
+    await sails.helpers.setRedis.with({
+      key,
+      type: "otp",
+      data: { count: getDataFromRedis.data.data.count + 1 },
+      expired: getDataFromRedis.data.expired
+    });
+  } else if (
+    getDataFromRedis &&
+    getDataFromRedis.data.data &&
+    getDataFromRedis.data.data.count >= 4 &&
+    getDataFromRedis.data.expired < new Date().getTime()
+  ) {
+    await sails.helpers.setRedis.with({
+      key,
+      type: "otp",
+      data: { count: 1 },
+      expired
+    });
+  }
+}

@@ -16,7 +16,7 @@
     "exceljs": "^1.13.0",
     "firebase": "*",
     "firebase-admin": "*",
-    "grunt": "1.0.1",
+    "grunt": "1.5.2",
     "jsonwebtoken": "^8.5.1",
     "mongodb": "^3.2.7",
     "nodemailer": "^6.3.0",

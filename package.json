@@ -17,7 +17,7 @@
     "firebase": "*",
     "firebase-admin": "*",
     "grunt": "1.0.1",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "mongodb": "^3.2.7",
     "nodemailer": "^6.3.0",
     "nodemon": "^1.19.1",
